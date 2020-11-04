@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import es
 import json
 from datetime import datetime
 from datetime import timedelta
 import csv
 import sys
+import argparse
+import utils
 
 associations = {
         "title": "Song Title",
@@ -17,6 +18,7 @@ associations = {
         "date": "Date",
 }
 keys = associations.keys()
+args = {}
 
 # datetime.strptime(line[DATE], "%Y-%m-%d %H:%M:%S.000")
 
@@ -35,8 +37,11 @@ class Track(dict):
         return self
 
 class Catalog():
-    def __init__(self):
+    def __init__(self, tracks=None):
         self.tracks = {}
+        if tracks is not None:
+            for track in tracks:
+                self += track
 
     def __add__(self, other):
         if other.ISRC in self.tracks:
@@ -73,6 +78,10 @@ class ListTrack(dict):
         super().__init__(tmp_dict)
         self.__dict__ = self
 
+    def is_valid(self):
+        global args
+        return utils.validation_algorithms[args.valid_algo](self)
+
     def id(self):
         return f"{self.ISRC}{str(datetime.timestamp(self.date))}"
 
@@ -97,10 +106,43 @@ def parse_file(path, tracks, catalog):
             tracks.append(track)
             catalog += track
 
-tracks = []
-catalog = Catalog()
-for path in sys.argv[1:]:
-    parse_file(path, tracks, catalog)
-es.bulk(tracks)
-for track in catalog.search("no eyes"):
-    print(track)
+def config():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--es", type=str, default="false", choices=["true", "false"])
+    parser.add_argument("--valid-algo", type=str, default="min_10", choices=utils.validation_algorithms.keys(), help="Defines what algorithm to use to know if a track was really listened to or not")
+
+    actions = parser.add_argument_group('Actions')
+    actions.add_argument("--top-track", action="store_true", default=False, help="List the top tracks")
+
+    parser.add_argument("files", nargs="+")
+    args = parser.parse_args()
+    assert args.valid_algo in utils.validation_algorithms
+    actions = ["top_track"]
+    args.actions = []
+    for action in actions:
+        if getattr(args, action):
+            args.actions.append(action)
+    return args
+
+def main():
+    global args
+    args = config()
+
+    tracks = []
+    catalog = Catalog()
+    for path in args.files:
+        parse_file(path, tracks, catalog)
+
+    if len(args.actions) > 0:
+        sub_tracks = [x for x in tracks if x.is_valid()]
+        sub_catalog = Catalog(sub_tracks)
+
+    for action in args.actions:
+        getattr(utils, action)(sub_tracks, sub_catalog)
+
+    if args.es == "true":
+        import es
+        es.reset_index()
+        es.bulk(tracks)
+
+main()

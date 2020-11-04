@@ -33,9 +33,10 @@ mapping = {
         }
     }
 }
-es.indices.delete(index='deezer')
-es.indices.create(index='deezer', ignore=[400], body=mapping)
 
+def reset_index():
+    es.indices.delete(index='deezer', ignore=[404])
+    es.indices.create(index='deezer', ignore=[400], body=mapping)
 
 def bulk(tracks):
     actions = [
