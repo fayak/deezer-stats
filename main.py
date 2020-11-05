@@ -24,7 +24,7 @@ args = {}
 
 class Track(dict):
     def __repr__(self):
-        return f"{self['title']} - {self['artist']} ({self.nb} listening)"
+        return f"{self['title']} - {self['artist']}"
 
     def __init__(self, track):
         super().__init__({**track, "nb": 0, "list_time_sum": 0})
@@ -113,11 +113,14 @@ def config():
 
     actions = parser.add_argument_group('Actions')
     actions.add_argument("--top-track", action="store_true", default=False, help="List the top tracks")
+    actions.add_argument("--top-track-by-time", action="store_true", default=False, help="List the top tracks by listening time")
+    actions.add_argument("--top", type=int, default=25, help="The top size")
+    actions.add_argument("--min", type=int, default=100, help="All songs listened minimun x times")
 
     parser.add_argument("files", nargs="+")
     args = parser.parse_args()
     assert args.valid_algo in utils.validation_algorithms
-    actions = ["top_track"]
+    actions = ["top_track", "top_track_by_time", "min"]
     args.actions = []
     for action in actions:
         if getattr(args, action):
@@ -138,7 +141,7 @@ def main():
         sub_catalog = Catalog(sub_tracks)
 
     for action in args.actions:
-        getattr(utils, action)(sub_tracks, sub_catalog)
+        getattr(utils, action)(sub_tracks, sub_catalog, args)
 
     if args.es == "true":
         import es
