@@ -12,9 +12,13 @@ def va_min_10(list_track):
 def va_all(list_track):
     return True
 
+def va_min_30(list_track):
+    return list_track.list_time > 30
+
 
 validation_algorithms = {
     "min_10": va_min_10,
+    "min_30": va_min_30,
     "all": va_all,
     }
 
@@ -47,17 +51,31 @@ def print_tracks(tracks, title, top):
     for item,_ in zip(tracks, range(1, top + 1)):
         print(f"[{_:4}] {item[1].nb:3} ({str(timedelta(seconds=item[1].list_time_sum))}): {item[1]}")
 
+def print_artists(artists, title, top):
+    print(title)
+    max_a_len = max([len(x[1].name) for x,_ in zip(artists, range(top))])
+    for item,_ in zip(artists, range(1, top + 1)):
+        print(f"[{_:4}] {item[1].nb:4} times ({str(timedelta(seconds=item[1].list_time)):16}): {item[1].name}{str(' ' * (max_a_len - len(item[1].name)))} - from {str(item[1].dates[0]):16} to {str(item[1].dates[-1]):16}")
+
 def _top_tracks(tracks, catalog):
     sorted_tracks = sorted(catalog.tracks.items(), key=lambda item: item[1].nb, reverse=True)
     return sorted_tracks
 
-def top_track(tracks, catalog, args):
+def top_tracks(tracks, catalog, args):
     sorted_tracks = _top_tracks(tracks, catalog)
-    print_tracks(sorted_tracks, "Top most listened track", args.top)
+    print_tracks(sorted_tracks, "Top most listened tracks", args.top)
 
-def top_track_by_time(tracks, catalog, args):
+def top_artists(tracks, catalog, args):
+    sorted_artists = sorted(catalog.artists.items(), key=lambda item: item[1].nb, reverse=True)
+    print_artists(sorted_artists, "Top most listened artists", args.top)
+
+def top_artists_by_time(tracks, catalog, args):
+    sorted_artists = sorted(catalog.artists.items(), key=lambda item: item[1].list_time, reverse=True)
+    print_artists(sorted_artists, "Top most listened artists by listening-time", args.top)
+
+def top_tracks_by_time(tracks, catalog, args):
     sorted_tracks = sorted(catalog.tracks.items(), key=lambda item: item[1].list_time_sum, reverse=True)
-    print_tracks(sorted_tracks, "Top most listened track by listening-time", args.top)
+    print_tracks(sorted_tracks, "Top most listened tracks by listening-time", args.top)
 
 def min(tracks, catalog, args):
     sorted_tracks = sorted(catalog.tracks.items(), key=lambda item: item[1].nb, reverse=True)
@@ -69,6 +87,12 @@ def min(tracks, catalog, args):
             i += 1
         else:
             break
+
+def listen_time(tracks, catalog, args):
+    list_time = 0
+    for track in tracks:
+        list_time += track.list_time
+    print(f"Time listened : {str(timedelta(seconds=list_time))}")
 
 def forgotten_hits(tracks, catalog, args):
     from main import Catalog

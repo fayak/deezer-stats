@@ -32,7 +32,6 @@ class ListTrack(dict):
                 tmp_dict[k] = datetime.strptime(line[v], "%Y-%m-%d %H:%M:%S.000")
             else:
                 tmp_dict[k] = line[v]
-
         super().__init__(tmp_dict)
         self.__dict__ = self
 
@@ -75,9 +74,33 @@ class Track(dict):
     def __eq__(self, other):
         return self.ISRC == other.ISRC
 
+class Artist(dict):
+    def __repr__(self):
+        return f"{self['name']} - from {str(self.dates[0]):16} to {str(self.dates[-1]):16}"
+
+    def __init__(self, name, list_time, date):
+        super().__init__({"name": name, "nb": 1, "list_time": list_time, "dates": [date]})
+        self.__dict__ = self
+
+    def __add__(self, other):
+        self.nb += 1
+        if isinstance(other, dict):
+            self.list_time += other['list_time']
+            self.dates.append(other['date'])
+            self.dates.sort()
+        elif isinstance(other, int):
+            self.list_time += other
+        else:
+            raise Exception(f"{other=} not handled")
+        return self
+
+    def __eq__(self, other):
+        return self.name == other.name
+
 class Catalog():
     def __init__(self, tracks=None):
         self.tracks = {}
+        self.artists = {}
         if tracks is not None:
             for track in tracks:
                 self += track
@@ -87,6 +110,18 @@ class Catalog():
             self.tracks[other.ISRC] += other
         else:
             self.tracks[other.ISRC] = Track(other)
+
+        if args != {} and args.split_comma_separated_artists:
+            artists = other.artist.split(', ')
+        else:
+            artists = [other.artist]
+
+        for artist in artists:
+            artist = artist.strip()
+            if artist in self.artists:
+                self.artists[artist] += other
+            else:
+                self.artists[artist] = Artist(name=artist, list_time=other.list_time, date=other.date)
         return self
 
     def __getitem__(self, key):
@@ -114,10 +149,13 @@ def config():
     parser = argparse.ArgumentParser()
     parser.add_argument("--es", type=str, default="false", choices=["true", "false"])
     parser.add_argument("--valid-algo", type=str, default="min_10", choices=utils.validation_algorithms.keys(), help="Defines what algorithm to use to know if a track was really listened to or not")
+    parser.add_argument("--split-comma-separated-artists", action="store_true", default=False)
 
     actions = parser.add_argument_group('Actions')
-    actions.add_argument("--top-track", action="store_true", default=False, help="List the top tracks")
-    actions.add_argument("--top-track-by-time", action="store_true", default=False, help="List the top tracks by listening time")
+    actions.add_argument("--top-tracks", action="store_true", default=False, help="List the top tracks")
+    actions.add_argument("--top-tracks-by-time", action="store_true", default=False, help="List the top tracks by listening time")
+    actions.add_argument("--top-artists", action="store_true", default=False, help="List the top artists")
+    actions.add_argument("--top-artists-by-time", action="store_true", default=False, help="List the top artists by listening time")
     actions.add_argument("--top", type=int, default=25, help="The top size")
     actions.add_argument("--min", type=int, default=None, help="All songs listened minimun x times")
     actions.add_argument("--forgotten-hits", action="store_true", default=False)
@@ -125,6 +163,7 @@ def config():
     actions.add_argument("--forgotten-hits-end", type=datetime.fromisoformat, default=None)
     actions.add_argument("--forgotten-hits-top", type=int, default=100)
     actions.add_argument("--forgotten-hits-bucket-size", type=int, default=3)
+    actions.add_argument("--listen-time", action="store_true", default=False)
 
     filters = parser.add_argument_group('Filters')
     filters.add_argument("--date-before", type=datetime.fromisoformat, default=None, help="Filter out tracks listened after this date")
@@ -134,7 +173,7 @@ def config():
     args = parser.parse_args()
 
     assert args.valid_algo in utils.validation_algorithms
-    actions = ["top_track", "top_track_by_time", "min", "forgotten_hits"]
+    actions = ["top_tracks", "top_tracks_by_time", "min", "forgotten_hits", "listen_time", "top_artists", "top_artists_by_time"]
     filters = ["date_before", "date_after"]
 
     args.actions = []
